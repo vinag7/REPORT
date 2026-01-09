@@ -3,18 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REPORT</title>
+    <title>Pallet Scanner Pro</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        iframe {
-            width: 100%;
-            height: 600px;
-            border: none;
-            overflow-x: hidden;
-        }
+        :root { --primary: #2563eb; --success: #16a34a; --bg: #f8fafc; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #1e293b; margin-top: 0; }
+        #reader { border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; }
+        .stats-bar { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        th { background: #f1f5f9; }
+        .btn-confirm { width: 100%; padding: 12px; background: var(--success); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; display: none; }
+        .loading { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
 <body>
-    <h2>BÁO CÁO SẢN XUẤT</h2>
-    <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRhtOebven6_9xdxHzsv4kFZqgcl8LTGwq0FBx4ofRRFzTIsAD2-W5z2fUkIXLy7Sq2TJ_7jFgYU24S/pubhtml?gid=787666148&amp;single=true&amp;widget=true&amp;headers=false"></iframe></iframe>
+
+<div class="container">
+    <h2>📦 Quét Pallet</h2>
+    <div id="reader"></div>
+    
+    <div class="stats-bar">
+        <span>Tiến độ: <span id="count">0</span>/4 thùng</span>
+        <button onclick="resetApp()" style="font-size: 12px;">Làm mới</button>
+    </div>
+
+    <table id="resultTable">
+        <thead>
+            <tr>
+                <th>Thùng</th>
+                <th>Mã Sản Phẩm</th>
+                <th>Giờ</th>
+            </tr>
+        </thead>
+        <tbody id="scanList">
+            </tbody>
+    </table>
+
+    <button id="confirmBtn" class="btn-confirm" onclick="sendAllData()">XÁC NHẬN & LƯU GOOGLE SHEET</button>
+    <div id="statusMsg" style="margin-top: 10px; font-weight: bold;"></div>
+</div>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw2nIJfqj5v6yAzMZT_wxvabuqM-Lu6fy1Wc3lTRjG-iCBglS7gXudo0xS39f4-a6U1/exec";
+    let scannedItems = [];
+
+    function onScanSuccess(decodedText) {
+        if (scannedItems.length < 4) {
+            // Kiểm tra trùng mã (nếu cần)
+            const now = new Date().toLocaleTimeString('vi-VN');
+            scannedItems.push({ maSP: decodedText, ngay: new Date().toLocaleDateString('vi-VN') + ' ' + now, soLuong: 1 });
+            
+            updateUI();
+            
+            // Âm thanh báo hiệu (tùy chọn)
+            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
+            audio.play();
+
+            if (scannedItems.length === 4) {
+                document.getElementById('confirmBtn').style.display = 'block';
+                document.getElementById('statusMsg').innerText = "Đã đủ 4 thùng! Vui lòng kiểm tra và nhấn Xác nhận.";
+            }
+        }
+    }
+
+    function updateUI() {
+        const list = document.getElementById('scanList');
+        list.innerHTML = "";
+        scannedItems.forEach((item, index) => {
+            list.innerHTML += `<tr><td>${index + 1}</td><td>${item.maSP}</td><td>${item.ngay.split(' ')[1]}</td></tr>`;
+        });
+        document.getElementById('count').innerText = scannedItems.length;
+    }
+
+    async function sendAllData() {
+        const btn = document.getElementById('confirmBtn');
+        const msg = document.getElementById('statusMsg');
+        
+        btn.classList.add('loading');
+        btn.innerText = "ĐANG GỬI...";
+        
+        try {
+            for (let data of scannedItems) {
+                await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Để tránh lỗi CORS khi dùng Google Script
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+            }
+            msg.style.color = "green";
+            msg.innerText = "✅ Đã lưu dữ liệu thành công lên Google Sheet!";
+            btn.style.display = 'none';
+            scannedItems = []; // Reset dữ liệu
+        } catch (error) {
+            msg.style.color = "red";
+            msg.innerText = "❌ Lỗi khi gửi dữ liệu!";
+        }
+    }
+
+    function resetApp() {
+        location.reload();
+    }
+
+    let scanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
+    scanner.render(onScanSuccess);
+</script>
+
 </body>
 </html>
