@@ -32,7 +32,8 @@
 
     <table id="resultTable">
         <thead>
-            <tr>               
+            <tr>          
+                <th>SL</th>
                 <th>Mã Sản Phẩm</th>
                 <th>Giờ</th>
             </tr>
@@ -53,7 +54,7 @@
         if (scannedItems.length < 4) {
             // Kiểm tra trùng mã (nếu cần)
             const now = new Date().toLocaleTimeString('vi-VN');
-            scannedItems.push({ maSP: decodedText, ngay: new Date().toLocaleDateString('vi-VN') + ' ' + now, soLuong: 1 });
+            scannedItems.push({ maSP: decodedText, ngay: new Date().toLocaleDateString('vi-VN') + ' ' + now});
             
             updateUI();
             
@@ -106,11 +107,19 @@
         location.reload();
     }
 
-    let scanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
-    scanner.render(onScanSuccess);
+    let scanner = new Html5QrcodeScanner("reader", { 
+    fps: 20, 
+    qrbox: {width: 250, height: 150}, // Hình chữ nhật cho mã vạch dài
+    formatsToSupport: [ 
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.QR_CODE 
+    ]
+});
 </script>
 
 </body>
 </html>
+
 
 
