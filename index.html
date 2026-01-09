@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pallet Scanner Pro</title>
+    <title>VINA G7 JSC - Kiểm tra nhập kho</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #2563eb; --success: #16a34a; --bg: #f8fafc; }
@@ -79,29 +79,28 @@
     }
 
     async function sendAllData() {
-        const btn = document.getElementById('confirmBtn');
-        const msg = document.getElementById('statusMsg');
-        
-        btn.classList.add('loading');
-        btn.innerText = "ĐANG GỬI...";
-        
-        try {
-            for (let data of scannedItems) {
-                await fetch(WEB_APP_URL, {
-                    method: "POST",
-                    mode: "no-cors", // Để tránh lỗi CORS khi dùng Google Script
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(data)
-                });
-            }
-            msg.style.color = "green";
-            msg.innerText = "✅ Đã lưu dữ liệu thành công lên Google Sheet!";
-            btn.style.display = 'none';
-            scannedItems = []; // Reset dữ liệu
-        } catch (error) {
-            msg.style.color = "red";
-            msg.innerText = "❌ Lỗi khi gửi dữ liệu!";
+    const btn = document.getElementById('confirmBtn');
+    const msg = document.getElementById('statusMsg');
+    
+    btn.innerText = "ĐANG GỬI...";
+    
+    try {
+        for (let data of scannedItems) {
+            // Sử dụng URLSearchParams hoặc gửi JSON chuẩn
+            await fetch(WEB_APP_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8", 
+                },
+                body: JSON.stringify(data)
+            });
         }
+        msg.innerHTML = "<span style='color:green'>✅ Đã lưu vào WarehouseData!</span>";
+        scannedItems = [];
+        updateUI();
+    } catch (error) {
+        msg.innerHTML = "<span style='color:red'>❌ Lỗi: " + error + "</span>";
+    }
     }
 
     function resetApp() {
@@ -114,3 +113,4 @@
 
 </body>
 </html>
+
