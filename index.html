@@ -3,123 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VINA G7 JSC - Kiểm tra nhập kho</title>
+    <title>Hệ Thống Quét Pallet Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        :root { --primary: #2563eb; --success: #16a34a; --bg: #f8fafc; }
-        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { color: #1e293b; margin-top: 0; }
-        #reader { border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; }
-        .stats-bar { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-        th { background: #f1f5f9; }
-        .btn-confirm { width: 100%; padding: 12px; background: var(--success); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 15px; display: none; }
-        .loading { opacity: 0.5; pointer-events: none; }
+        :root { --primary: #2563eb; --success: #16a34a; --error: #dc2626; --bg: #f1f5f9; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        #reader { border-radius: 12px; overflow: hidden; border: 2px solid #cbd5e1; background: #000; }
+        .info-card { background: #eff6ff; border-left: 5px solid var(--primary); padding: 15px; margin: 15px 0; display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        th { background: #f8fafc; color: #64748b; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .btn-confirm { background: var(--success); color: white; display: none; }
+        .btn-save { background: var(--primary); color: white; margin-top: 20px; }
+        .status { font-weight: bold; margin: 10px 0; color: var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📦 Quét Pallet</h2>
+    <h2 style="text-align: center; color: #1e293b;">📦 Quản Lý Pallet</h2>
+    
     <div id="reader"></div>
     
-    <div class="stats-bar">
-        <span>Tiến độ: <span id="count">0</span>/4 thùng</span>
-        <button onclick="resetApp()" style="font-size: 12px;">Làm mới</button>
+    <div id="statusMsg" class="status">Sẵn sàng quét thùng 1...</div>
+
+    <div id="infoCard" class="info-card">
+        <h4 style="margin: 0 0 10px 0;">XÁC NHẬN SẢN PHẨM:</h4>
+        <p><b>Mã SP:</b> <span id="resMa"></span></p>
+        <p><b>Tên SP:</b> <span id="resTen"></span></p>
+        <p><b>Màu sắc:</b> <span id="resMau"></span></p>
+        <button class="btn btn-confirm" id="btnAccept" onclick="acceptItem()">✅ ĐÚNG - TIẾP TỤC</button>
+        <button class="btn" style="background:#cbd5e1;" onclick="cancelItem()">HỦY - QUÉT LẠI</button>
     </div>
 
-    <table id="resultTable">
-        <thead>
-            <tr>          
-                <th>SL</th>
-                <th>Mã Sản Phẩm</th>
-                <th>Giờ</th>
-            </tr>
-        </thead>
-        <tbody id="scanList">
-            </tbody>
-    </table>
+    <div style="margin-top: 20px;">
+        <strong>Danh sách Pallet (<span id="count">0</span>/4 thùng):</strong>
+        <table id="logTable">
+            <thead>
+                <tr>
+                    <th>Thùng</th>
+                    <th>Mã SP</th>
+                    <th>Tên SP</th>
+                </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+        </table>
+    </div>
 
-    <button id="confirmBtn" class="btn-confirm" onclick="sendAllData()">XÁC NHẬN & LƯU GOOGLE SHEET</button>
-    <div id="statusMsg" style="margin-top: 10px; font-weight: bold;"></div>
+    <button id="btnFinalSave" class="btn btn-save" style="display: none;" onclick="sendToGoogleSheet()">💾 LƯU DỮ LIỆU LÊN SHEET</button>
 </div>
 
 <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw2nIJfqj5v6yAzMZT_wxvabuqM-Lu6fy1Wc3lTRjG-iCBglS7gXudo0xS39f4-a6U1/exec";
+    // CẤU HÌNH TẠI ĐÂY
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxfc_Yk9TPXL8Pm2JywkZs0m7y3pzHHlN1_EmHvbEhMyb3l7v6Ec9Aip9V0cKLDVWdM/exec";
     let scannedItems = [];
+    let currentData = null; 
 
-    function onScanSuccess(decodedText) {
-        if (scannedItems.length < 4) {
-            // Kiểm tra trùng mã (nếu cần)
-            const now = new Date().toLocaleTimeString('vi-VN');
-            scannedItems.push({ maSP: decodedText, ngay: new Date().toLocaleDateString('vi-VN') + ' ' + now});
-            
-            updateUI();
-            
-            // Âm thanh báo hiệu (tùy chọn)
-            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
-            audio.play();
+    // Khởi tạo Scanner
+    const scanner = new Html5QrcodeScanner("reader", { 
+        fps: 20, 
+        qrbox: {width: 250, height: 150},
+        aspectRatio: 1.0
+    });
+    scanner.render(onScanSuccess);
 
-            if (scannedItems.length === 4) {
-                document.getElementById('confirmBtn').style.display = 'block';
-                document.getElementById('statusMsg').innerText = "Đã đủ 4 thùng! Vui lòng kiểm tra và nhấn Xác nhận.";
+    async function onScanSuccess(decodedText) {
+        if (scannedItems.length >= 4) return;
+        
+        // Rung và tiếng kêu khi nhận mã
+        if (navigator.vibrate) navigator.vibrate(100);
+        new Audio('https://www.soundjay.com/buttons/beep-07.mp3').play();
+
+        scanner.pause(); // Dừng camera để xác nhận
+        document.getElementById('statusMsg').innerText = "🔎 Đang kiểm tra danh mục...";
+
+        try {
+            const response = await fetch(WEB_APP_URL, {
+                method: "POST",
+                body: JSON.stringify({ action: "lookup", maSP: decodedText })
+            });
+            const result = await response.json();
+
+            if (result.found) {
+                currentData = {
+                    maSP: decodedText,
+                    tenSP: result.tenSP,
+                    mauSac: result.mauSac,
+                    ngay: new Date().toLocaleString('vi-VN'),
+                    soLuong: 1
+                };
+                showInfo(currentData);
+            } else {
+                alert("❌ Không tìm thấy mã này trong tab Products!");
+                scanner.resume();
+                document.getElementById('statusMsg').innerText = "Vui lòng quét lại...";
             }
+        } catch (e) {
+            alert("Lỗi kết nối: " + e);
+            scanner.resume();
         }
     }
 
-    function updateUI() {
-        const list = document.getElementById('scanList');
-        list.innerHTML = "";
-        scannedItems.forEach((item, index) => {
-            list.innerHTML += `<tr><td>${index + 1}</td><td>${item.maSP}</td><td>${item.ngay.split(' ')[1]}</td></tr>`;
-        });
+    function showInfo(data) {
+        document.getElementById('infoCard').style.display = 'block';
+        document.getElementById('btnAccept').style.display = 'block';
+        document.getElementById('resMa').innerText = data.maSP;
+        document.getElementById('resTen').innerText = data.tenSP;
+        document.getElementById('resMau').innerText = data.mauSac;
+        document.getElementById('statusMsg').innerText = "Chờ xác nhận...";
+    }
+
+    function acceptItem() {
+        scannedItems.push(currentData);
+        updateTable();
+        
+        document.getElementById('infoCard').style.display = 'none';
+        
+        if (scannedItems.length < 4) {
+            document.getElementById('statusMsg').innerText = `Đã xong thùng ${scannedItems.length}. Quét tiếp...`;
+            scanner.resume();
+        } else {
+            document.getElementById('statusMsg').innerText = "🔥 Đã đủ 4 thùng! Nhấn Lưu ngay.";
+            document.getElementById('btnFinalSave').style.display = 'block';
+            scanner.clear(); // Tắt camera hoàn toàn
+        }
+    }
+
+    function cancelItem() {
+        document.getElementById('infoCard').style.display = 'none';
+        document.getElementById('statusMsg').innerText = "Đã hủy. Vui lòng quét lại.";
+        scanner.resume();
+    }
+
+    function updateTable() {
+        const body = document.getElementById('logBody');
+        body.innerHTML = scannedItems.map((item, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${item.maSP}</td>
+                <td>${item.tenSP}</td>
+            </tr>
+        `).join('');
         document.getElementById('count').innerText = scannedItems.length;
     }
 
-    async function sendAllData() {
-    const btn = document.getElementById('confirmBtn');
-    const msg = document.getElementById('statusMsg');
-    
-    btn.innerText = "ĐANG GỬI...";
-    
+    async function sendToGoogleSheet() {
+    const btn = document.getElementById('btnFinalSave');
+    btn.disabled = true;
+    btn.innerText = "⏳ ĐANG LƯU...";
+
     try {
-        for (let data of scannedItems) {
-            // Sử dụng URLSearchParams hoặc gửi JSON chuẩn
+        for (let item of scannedItems) {
+            // Gửi dữ liệu theo đúng cấu trúc 2 thông tin cần thiết
             await fetch(WEB_APP_URL, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "text/plain;charset=utf-8", 
-                },
-                body: JSON.stringify(data)
+                mode: "no-cors", // Tránh lỗi CORS trên một số trình duyệt di động
+                body: JSON.stringify({ 
+                    action: "save", 
+                    maSP: item.maSP,  // Sẽ vào cột A
+                    ngay: item.ngay   // Sẽ vào cột B
+                })
             });
         }
-        msg.innerHTML = "<span style='color:green'>✅ Đã lưu vào WarehouseData!</span>";
-        scannedItems = [];
-        updateUI();
-    } catch (error) {
-        msg.innerHTML = "<span style='color:red'>❌ Lỗi: " + error + "</span>";
+        alert("✅ ĐÃ LƯU 4 THÙNG VÀO CỘT A & B!");
+        location.reload(); 
+    } catch (e) {
+        alert("Lỗi kết nối: " + e);
+        btn.disabled = false;
     }
-    }
-
-    function resetApp() {
-        location.reload();
-    }
-
-    let scanner = new Html5QrcodeScanner("reader", { 
-    fps: 20, 
-    qrbox: {width: 250, height: 150}, // Hình chữ nhật cho mã vạch dài
-    formatsToSupport: [ 
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.QR_CODE 
-    ]
-});
+}
 </script>
 
 </body>
 </html>
-
-
-
